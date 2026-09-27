@@ -3,23 +3,25 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as pdfjs from "pdfjs-dist";
-import { PROVIDERS, type StudyMaterial, type StudyCourse } from "@/lib/workspace";
+import { flushWorkspaceSync, PROVIDERS, saveCourse, saveMaterialFile, type StudyMaterial, type StudyCourse } from "@/lib/workspace";
+import { useAuth } from "@/components/AuthProvider";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 export default function NewCoursePage() {
   const router = useRouter();
+  const { workspaceReady } = useAuth();
   const [topic, setTopic] = useState("");
   const [provider, setProvider] = useState<string>(PROVIDERS[0].id);
   const [model, setModel] = useState<string>(PROVIDERS[0].model);
-  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  const [materials, setMaterials] = useState<(StudyMaterial & { file?: File })[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function addFiles(files: FileList | null) {
     if (!files) return;
     setError("");
-    const incoming: StudyMaterial[] = [];
+    const incoming: (StudyMaterial & { file?: File })[] = [];
     for (const file of Array.from(files).slice(0, 12)) {
       const isPdf = /\.pdf$/i.test(file.name);
       if (!isPdf && !/\.(txt|md|markdown|csv)$/i.test(file.name)) {
@@ -43,10 +45,10 @@ export default function NewCoursePage() {
           }
           const content = pages.join("\n\n").slice(0, 12000).trim();
           if (!content) throw new Error("No readable text was found. This PDF may contain scanned images.");
-          incoming.push({ name: file.name, content });
+          incoming.push({ id: crypto.randomUUID(), name: file.name, content, type: "pdf", file });
           await loadingTask.destroy();
         } else {
-          incoming.push({ name: file.name, content: (await file.text()).slice(0, 12000) });
+          incoming.push({ id: crypto.randomUUID(), name: file.name, content: (await file.text()).slice(0, 12000), type: "text" });
         }
       } catch (reason) {
         setError(`${file.name}: ${reason instanceof Error ? reason.message : "Could not read this file."}`);
@@ -60,10 +62,11 @@ export default function NewCoursePage() {
     setError("");
     setBusy(true);
     try {
+      if (!workspaceReady) throw new Error("Your private workspace is still connecting. Try again shortly.");
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "path", provider, model, topic, materials }),
+        body: JSON.stringify({ action: "path", provider, model, topic, materials: materials.map(({ name, content }) => ({ name, content })) }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not create the learning path.");
@@ -73,11 +76,15 @@ export default function NewCoursePage() {
         description: result.description,
         provider,
         model,
-        materials,
+        materials: materials.map(({ id, name, content, type }) => ({ id, name, content, type })),
         sections: result.sections,
         updatedAt: new Date().toISOString(),
       };
-      localStorage.setItem("study-workspace-courses", JSON.stringify([course, ...JSON.parse(localStorage.getItem("study-workspace-courses") ?? "[]")]));
+      for (const material of materials) {
+        if (material.file && material.id) await saveMaterialFile(course.id, material.id, material.file);
+      }
+      saveCourse(course);
+      await flushWorkspaceSync();
       router.push(`/courses/${course.id}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not create the learning path.");
@@ -120,7 +127,7 @@ export default function NewCoursePage() {
         </div>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <div className="flex items-center space-x-4 pt-2">
-          <button disabled={busy || (!topic.trim() && materials.length === 0)} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors text-sm">{busy ? "Building your path…" : "Create learning path"}</button>
+          <button disabled={busy || !workspaceReady || (!topic.trim() && materials.length === 0)} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors text-sm">{busy ? "Building your path…" : !workspaceReady ? "Connecting workspace…" : "Create learning path"}</button>
           <Link href="/courses" className="px-6 py-2.5 text-slate-600 hover:text-slate-900 font-medium text-sm">Cancel</Link>
         </div>
       </form>

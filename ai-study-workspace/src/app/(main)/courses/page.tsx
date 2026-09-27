@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { DeleteButton } from "@/components/DeleteButton";
 import { deleteCourseData, readCourses, readDeletedCourseIds, type StudyCourse } from "@/lib/workspace";
+import { useAuth } from "@/components/AuthProvider";
 
 const COURSES = [
   { id: "ins-204", name: "INS 204", title: "Systems Thinking", progress: 42, color: "bg-emerald-500" },
@@ -12,12 +13,15 @@ const COURSES = [
 ];
 
 export default function CoursesPage() {
+  const { workspaceReady, workspaceRevision } = useAuth();
   const [created, setCreated] = useState<StudyCourse[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   useEffect(() => {
+    if (!workspaceReady) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCreated(readCourses());
     setDeletedIds(readDeletedCourseIds());
-  }, []);
+  }, [workspaceReady, workspaceRevision]);
 
   function removeCourse(id: string) {
     deleteCourseData(id);

@@ -2,13 +2,52 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { readDeletedCourseIds } from "@/lib/workspace";
+import { readCourses, readDeletedCourseIds, readReviewProgress, type StudyCourse } from "@/lib/workspace";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function Home() {
+  const { workspaceReady, workspaceRevision } = useAuth();
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
-  useEffect(() => setDeletedIds(readDeletedCourseIds()), []);
+  const [savedCourses, setSavedCourses] = useState<StudyCourse[]>([]);
+  const [reviewDueCount, setReviewDueCount] = useState(0);
+  useEffect(() => {
+    if (!workspaceReady) return;
+    // Read browser-only storage after mount to keep server and client markup aligned.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDeletedIds(readDeletedCourseIds());
+    const currentCourses = readCourses();
+    const reviewProgress = readReviewProgress();
+    setSavedCourses(currentCourses);
+    setReviewDueCount(currentCourses.reduce((count, course) => count + course.sections.filter((section) => {
+      const record = reviewProgress.find((item) => item.courseId === course.id && item.sectionId === section.id);
+      return !record || new Date(record.dueAt).getTime() <= Date.now();
+    }).length, 0));
+  }, [workspaceReady, workspaceRevision]);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const sampleCourses = [
+    { id: "ins-204", name: "INS 204", subtitle: "Systems Thinking", progress: 42, color: "bg-emerald-500" },
+    { id: "ooad", name: "OOAD", subtitle: "Object-Oriented Analysis", progress: 78, color: "bg-indigo-500" },
+    { id: "mth-103", name: "MTH 103", subtitle: "Probability", progress: 31, color: "bg-amber-500" },
+    { id: "csc-203", name: "CSC 203", subtitle: "Data Structures", progress: 61, color: "bg-blue-500" },
+  ];
+  const customCourses = savedCourses.filter((course) => !deletedIds.includes(course.id)).map((course) => ({
+    id: course.id,
+    name: course.name,
+    subtitle: course.description,
+    progress: 0,
+    color: "bg-emerald-500",
+  }));
+  const courses = [...customCourses, ...sampleCourses.filter((course) => !deletedIds.includes(course.id) && !customCourses.some((saved) => saved.id === course.id))];
+  const recentMaterials = savedCourses
+    .filter((course) => !deletedIds.includes(course.id))
+    .flatMap((course) => course.materials.map((material) => ({
+      title: material.name,
+      course: course.name,
+      courseId: course.id,
+      type: material.type === "pdf" ? "PDF" : "TXT",
+    })))
+    .slice(0, 5);
 
   return (
     <div className="max-w-6xl mx-auto px-8 py-12">
@@ -53,13 +92,8 @@ export default function Home() {
               <Link href="/courses" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">View all</Link>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {[
-                { id: "ins-204", name: "INS 204", subtitle: "Systems Thinking", progress: 42, color: "bg-emerald-500" },
-                { id: "ooad", name: "OOAD", subtitle: "Object-Oriented Analysis", progress: 78, color: "bg-indigo-500" },
-                { id: "mth-103", name: "MTH 103", subtitle: "Probability", progress: 31, color: "bg-amber-500" },
-                { id: "csc-203", name: "CSC 203", subtitle: "Data Structures", progress: 61, color: "bg-blue-500" },
-              ].filter((course) => !deletedIds.includes(course.id)).map((course) => (
-                <Link key={course.name} href={`/courses/${course.name.toLowerCase().replace(" ", "-")}`} className="block group">
+              {courses.length > 0 ? courses.map((course) => (
+                <Link key={course.id} href={`/courses/${course.id}`} className="block group">
                   <div className="bg-white border border-slate-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-sm transition-all">
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500">
@@ -76,7 +110,7 @@ export default function Home() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              )) : <div className="col-span-2 border border-dashed border-slate-300 p-6 text-center"><p className="text-sm text-slate-500">Your learning paths will appear here.</p><Link href="/courses/new" className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700">Create a learning path</Link></div>}
             </div>
           </section>
 
@@ -84,12 +118,8 @@ export default function Home() {
           <section>
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Recent Materials</h2>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm divide-y divide-slate-100">
-              {[
-                { title: "Lecture 4 & 5", course: "INS 204", courseId: "ins-204", date: "2 days ago", type: "PDF" },
-                { title: "Comprehensive Note", course: "OOAD", courseId: "ooad", date: "Yesterday", type: "DOCX" },
-                { title: "Lecture 3", course: "MTH 202", courseId: "mth-103", date: "Last week", type: "PDF" },
-              ].filter((doc) => !deletedIds.includes(doc.courseId)).map((doc, i) => (
-                <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
+              {recentMaterials.length > 0 ? recentMaterials.map((doc, i) => (
+                <Link key={`${doc.courseId}-${doc.title}-${i}`} href={`/courses/${doc.courseId}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 rounded bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">
                       {doc.type}
@@ -99,20 +129,20 @@ export default function Home() {
                       <div className="text-xs text-slate-500">{doc.course}</div>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400">{doc.date}</span>
-                </div>
-              ))}
+                  <span className="text-xs text-slate-400">Material</span>
+                </Link>
+              )) : <div className="p-4 text-sm text-slate-500">Materials you add to a learning path will appear here.</div>}
             </div>
           </section>
         </div>
 
         <div className="space-y-6">
           {/* Needs Review */}
-          {!deletedIds.includes("ooad") && <section>
+          {reviewDueCount > 0 && <section>
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Needs Review</h2>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-              <div className="text-amber-900 font-semibold mb-1">3 concepts</div>
-              <p className="text-sm text-amber-700 mb-4">Topics that need another look before you move on.</p>
+              <div className="text-amber-900 font-semibold mb-1">{reviewDueCount} lessons due</div>
+              <p className="text-sm text-amber-700 mb-4">Short practice sessions are ready for review.</p>
               <Link href="/review" className="block text-center px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium rounded-lg transition-colors text-sm">
                 Start Review
               </Link>

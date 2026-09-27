@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/components/AuthProvider";
 
 function HomeIcon() {
   return (
@@ -55,6 +56,7 @@ const links = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="w-60 h-full bg-slate-50 border-r border-slate-200 flex flex-col pt-8 pb-4 flex-shrink-0">
@@ -89,6 +91,7 @@ export function Sidebar() {
 
       <div className="px-3 mt-4">
         <ThemeToggle />
+        {user && <button onClick={() => void signOut()} className="flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"><span className="truncate">Sign out · {user.email}</span></button>}
         <Link
           href="/settings"
           className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm"

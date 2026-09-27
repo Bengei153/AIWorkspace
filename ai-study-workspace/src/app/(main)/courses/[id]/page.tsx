@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeleteButton } from "@/components/DeleteButton";
 import { deleteCourseData, deleteMaterialData, findCourse, readDeletedCourseIds, readDeletedMaterialIds, type StudyCourse } from "@/lib/workspace";
+import { useAuth } from "@/components/AuthProvider";
 
 const COURSE_DATA = {
   "ins-204": { name: "INS 204", title: "Systems Thinking", lecturer: "Dr. Adeyemi", description: "Intro to systems thinking, feedback loops, and complex adaptive systems.", progress: 42, color: "bg-emerald-500", materials: [{ id: "ins-l1", title: "Lecture 1: Introduction", type: "PDF", sections: 5, progress: 100 },{ id: "ins-l2", title: "Lecture 2: Feedback Loops", type: "PDF", sections: 7, progress: 100 },{ id: "ins-l45", title: "Lecture 4 and 5", type: "PDF", sections: 9, progress: 20 }], concepts: [{ name: "System Boundaries", mastery: "Confident" },{ name: "Feedback Loops", mastery: "Needs Review" },{ name: "Adaptation", mastery: "Not Started" }] },
@@ -17,14 +18,22 @@ const M = { "Confident": "bg-emerald-100 text-emerald-700", "Practiced": "bg-blu
 export default function CourseDashboard({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
+  const { workspaceReady, workspaceRevision } = useAuth();
   const [savedCourse, setSavedCourse] = useState<StudyCourse>();
   const [deletedCourseIds, setDeletedCourseIds] = useState<string[]>([]);
   const [deletedMaterialIds, setDeletedMaterialIds] = useState<string[]>([]);
-  useEffect(() => setSavedCourse(findCourse(id)), [id]);
   useEffect(() => {
+    if (!workspaceReady) return;
+    // Refresh this client view when its private workspace cache changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSavedCourse(findCourse(id));
+  }, [id, workspaceReady, workspaceRevision]);
+  useEffect(() => {
+    if (!workspaceReady) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDeletedCourseIds(readDeletedCourseIds());
     setDeletedMaterialIds(readDeletedMaterialIds(id));
-  }, [id]);
+  }, [id, workspaceReady, workspaceRevision]);
   const course = deletedCourseIds.includes(id) ? undefined : COURSE_DATA[id as keyof typeof COURSE_DATA];
 
   function removeCourse() {
@@ -33,7 +42,9 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
   }
 
   function removeSavedMaterial(index: number) {
-    const materials = deleteMaterialData(id, `material-${index}`);
+    const material = savedCourse?.materials[index];
+    if (!material) return;
+    const materials = deleteMaterialData(id, material.id ?? `material-${index}`);
     if (materials && savedCourse) setSavedCourse({ ...savedCourse, materials });
   }
 
@@ -42,6 +53,7 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
     setDeletedMaterialIds((current) => [...new Set([...current, materialId])]);
   }
 
+  if (!workspaceReady) return <div className="p-10 text-sm text-slate-500">Loading your private workspace…</div>;
   if (savedCourse) {
     return (
       <div className="max-w-6xl mx-auto px-8 py-12">
