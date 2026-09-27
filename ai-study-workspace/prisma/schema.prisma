@@ -1,0 +1,127 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courses         Course[]
+  studySessions   StudySession[]
+  notes           Note[]
+  bookmarks       Bookmark[]
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  code        String?
+  lecturer    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials   CourseMaterial[]
+  concepts    Concept[]
+  sessions    StudySession[]
+}
+
+model CourseMaterial {
+  id          String   @id @default(cuid())
+  courseId    String
+  title       String
+  type        String   // pdf, docx, pptx, text
+  url         String?  // local path or object storage url
+  pageCount   Int?
+  status      String   // processing, indexed, error
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks      MaterialChunk[]
+  sections    MaterialSection[]
+}
+
+model MaterialSection {
+  id          String   @id @default(cuid())
+  materialId  String
+  title       String
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  material    CourseMaterial  @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  chunks      MaterialChunk[]
+}
+
+model MaterialChunk {
+  id          String   @id @default(cuid())
+  materialId  String
+  sectionId   String?
+  content     String
+  pageNumber  Int?
+  order       Int
+  embedding   String?  // Store vector id or raw array depending on DB
+  createdAt   DateTime @default(now())
+
+  material    CourseMaterial   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  section     MaterialSection? @relation(fields: [sectionId], references: [id])
+}
+
+model Concept {
+  id          String   @id @default(cuid())
+  courseId    String
+  name        String
+  description String?
+  mastery     String   @default("Not Started") // Not Started, Introduced, Learning, Practiced, Reviewed, Confident, Needs Review
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model StudySession {
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String
+  topic       String?
+  duration    Int      @default(0) // in seconds
+  status      String   @default("in_progress") // in_progress, completed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String?
+  title       String?
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bookmark {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  url         String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
