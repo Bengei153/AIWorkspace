@@ -38,6 +38,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState("");
   const [updated, setUpdated] = useState(false);
   const [sourcePdfs, setSourcePdfs] = useState<{ id: string; name: string; url: string }[]>([]);
+  const [pdfLoadError, setPdfLoadError] = useState("");
   const [studyView, setStudyView] = useState<"lesson" | "pdf">("lesson");
   const [selectedPdfId, setSelectedPdfId] = useState("");
 
@@ -63,6 +64,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
     if (!materialCourseId) return;
     let current = true;
     const urls: string[] = [];
+    let loadError = "";
     void Promise.all(sourceMaterials.map(async (material) => {
       try {
         const blob = await readMaterialFile(materialCourseId, material.id!);
@@ -71,6 +73,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
         urls.push(url);
         return { id: material.id!, name: material.name, url };
       } catch {
+        loadError ||= "A source PDF could not be downloaded from your private cloud storage. Check that you are signed into the same account and that the storage migration is applied.";
         return null;
       }
     })).then((loaded) => {
@@ -80,6 +83,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
       }
       const available = loaded.filter((item): item is { id: string; name: string; url: string } => item !== null);
       setSourcePdfs(available);
+      setPdfLoadError(available.length ? "" : loadError);
       setSelectedPdfId((selected) => available.some((item) => item.id === selected) ? selected : available[0]?.id ?? "");
     });
     return () => {
@@ -168,7 +172,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
             </div>
             {studyView === "lesson" ? <iframe key={`${active.id}-${active.html.length}-${active.js?.length ?? 0}`} title={`Interactive lesson: ${active.title}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={previewDocument(active)} className="h-[min(62dvh,760px)] min-h-[360px] w-full rounded-lg border border-slate-200 bg-white sm:h-[min(68vh,760px)] sm:min-h-[430px]" /> : <section aria-label="Original PDF" className="flex h-[min(70dvh,900px)] min-h-[420px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:h-[min(78vh,900px)] sm:min-h-[540px]">
               {pdfMaterials.length > 1 && <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2"><label htmlFor="source-pdf" className="text-xs font-medium text-slate-600">Source material</label><select id="source-pdf" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)} className="max-w-[70%] rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm">{pdfMaterials.map((material, index) => <option key={material.id ?? index} value={material.id ?? ""}>{material.name}</option>)}</select></div>}
-              {selectedPdf ? <iframe key={selectedPdf.id} title={`Original PDF: ${selectedPdf.name}`} src={selectedPdf.url} className="min-h-0 w-full flex-1 bg-white" /> : <div className="grid flex-1 place-items-center p-6 text-center text-sm text-slate-600">The original PDF isn’t available in this browser for this project. Re-upload it in a new learning path to keep a viewable copy.</div>}
+              {selectedPdf ? <iframe key={selectedPdf.id} title={`Original PDF: ${selectedPdf.name}`} src={selectedPdf.url} className="min-h-0 w-full flex-1 bg-white" /> : <div className="grid flex-1 place-items-center p-6 text-center text-sm text-slate-600">{pdfLoadError || "No viewable PDF is attached to this course."}</div>}
             </section>}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-400">Using {providerLabel} · {model}</span><div className="flex gap-2"><button disabled={activeIndex <= 0} onClick={() => setActiveIndex((index) => Math.max(0, index - 1))} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 disabled:opacity-40">Previous</button><button disabled={activeIndex >= lessonCount - 1} onClick={() => setActiveIndex((index) => Math.min(lessonCount - 1, index + 1))} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40">Next lesson</button></div></div>
           </div>

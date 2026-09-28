@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { applyRemoteWorkspace, clearActiveWorkspace, flushWorkspaceSync, initializeWorkspace, type WorkspaceSnapshot } from "@/lib/workspace";
+import { applyRemoteWorkspace, clearActiveWorkspace, flushWorkspaceSync, initializeWorkspace, type WorkspaceSnapshot, type WorkspaceSyncStatus } from "@/lib/workspace";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type AuthContextValue = {
@@ -12,11 +12,12 @@ type AuthContextValue = {
   workspaceReady: boolean;
   workspaceError: string;
   workspaceRevision: number;
+  workspaceSyncStatus: WorkspaceSyncStatus;
   retryWorkspace: () => void;
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue>({ user: null, authLoading: true, workspaceReady: false, workspaceError: "", workspaceRevision: 0, retryWorkspace: () => undefined, signOut: async () => undefined });
+const AuthContext = createContext<AuthContextValue>({ user: null, authLoading: true, workspaceReady: false, workspaceError: "", workspaceRevision: 0, workspaceSyncStatus: "saved", retryWorkspace: () => undefined, signOut: async () => undefined });
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const [workspaceSyncStatus, setWorkspaceSyncStatus] = useState<WorkspaceSyncStatus>("saved");
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
@@ -41,7 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let trackedUserId: string | null = null;
     let channel: ReturnType<typeof supabase.channel> | undefined;
     const onWorkspaceChanged = () => setWorkspaceRevision((revision) => revision + 1);
+    const onSyncStatusChanged = (event: Event) => setWorkspaceSyncStatus((event as CustomEvent<WorkspaceSyncStatus>).detail);
     window.addEventListener("workspace:changed", onWorkspaceChanged);
+    window.addEventListener("workspace:sync-status", onSyncStatusChanged);
     const synchronize = (nextUser: User | null) => {
       if (!mounted) return Promise.resolve();
       if (!nextUser) {
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setWorkspaceReady(false);
         setWorkspaceError("");
+        setWorkspaceSyncStatus("saved");
         setAuthLoading(false);
         return Promise.resolve();
       }
@@ -93,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
       window.removeEventListener("workspace:changed", onWorkspaceChanged);
+      window.removeEventListener("workspace:sync-status", onSyncStatusChanged);
       if (channel) void supabase.removeChannel(channel);
       subscription.unsubscribe();
     };
@@ -107,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value: AuthContextValue = {
-    user, authLoading, workspaceReady, workspaceError, workspaceRevision,
+    user, authLoading, workspaceReady, workspaceError, workspaceRevision, workspaceSyncStatus,
     retryWorkspace: () => setRetry((value) => value + 1),
     signOut,
   };

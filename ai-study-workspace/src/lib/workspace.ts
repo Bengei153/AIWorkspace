@@ -39,8 +39,19 @@ const WORKSPACE_PREFIX = "study-workspace-user:";
 const LEGACY_FILE_DB = "study-workspace-files";
 let activeUserId: string | null = null;
 let workspaceReady = false;
+export type WorkspaceSyncStatus = "saved" | "syncing" | "error";
+let workspaceSyncStatus: WorkspaceSyncStatus = "saved";
 let syncTimer: ReturnType<typeof setTimeout> | undefined;
 let syncChain: Promise<void> = Promise.resolve();
+
+function setWorkspaceSyncStatus(status: WorkspaceSyncStatus) {
+  workspaceSyncStatus = status;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("workspace:sync-status", { detail: status }));
+}
+
+export function readWorkspaceSyncStatus() {
+  return workspaceSyncStatus;
+}
 
 function emptyWorkspace(): WorkspaceSnapshot {
   return { courses: [], reviewProgress: [], deletedCourseIds: [], deletedMaterialIds: {} };
@@ -108,7 +119,13 @@ export function flushWorkspaceSync() {
   }
   if (!activeUserId || !workspaceReady) return Promise.resolve();
   const snapshot = readCachedWorkspace();
-  syncChain = syncChain.catch(() => undefined).then(() => sendSnapshot(snapshot));
+  setWorkspaceSyncStatus("syncing");
+  syncChain = syncChain.catch(() => undefined).then(() => sendSnapshot(snapshot)).then(() => {
+    setWorkspaceSyncStatus("saved");
+  }).catch((error: unknown) => {
+    setWorkspaceSyncStatus("error");
+    throw error;
+  });
   return syncChain;
 }
 
@@ -169,9 +186,11 @@ export async function initializeWorkspace(userId: string) {
   if (activeUserId === userId && workspaceReady) return;
   activeUserId = userId;
   workspaceReady = false;
+  setWorkspaceSyncStatus("syncing");
   const response = await fetch("/api/workspace", { cache: "no-store" });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
+    setWorkspaceSyncStatus("error");
     throw new Error(result.error ?? "Could not load your private workspace.");
   }
   const result = await response.json() as { found: boolean; workspace: WorkspaceSnapshot | null };
@@ -188,9 +207,15 @@ export async function initializeWorkspace(userId: string) {
   writeCachedWorkspace(snapshot, userId);
   workspaceReady = true;
   if (!result.found || !result.workspace) {
-    await sendSnapshot(snapshot);
+    try {
+      await sendSnapshot(snapshot);
+    } catch (error) {
+      setWorkspaceSyncStatus("error");
+      throw error;
+    }
     clearLegacyWorkspace();
   }
+  setWorkspaceSyncStatus("saved");
   window.dispatchEvent(new CustomEvent("workspace:ready", { detail: { userId } }));
 }
 
@@ -204,6 +229,7 @@ export function clearActiveWorkspace() {
 export function applyRemoteWorkspace(userId: string, snapshot: WorkspaceSnapshot) {
   if (!workspaceReady || activeUserId !== userId || !Array.isArray(snapshot.courses) || !Array.isArray(snapshot.reviewProgress)) return;
   if (JSON.stringify(readCachedWorkspace()) !== JSON.stringify(snapshot)) writeCachedWorkspace({ ...emptyWorkspace(), ...snapshot }, userId);
+  setWorkspaceSyncStatus("saved");
 }
 
 export function readCourses(): StudyCourse[] {
@@ -289,9 +315,13 @@ export async function saveMaterialFile(courseId: string, materialId: string, fil
 }
 
 export async function readMaterialFile(courseId: string, materialId: string) {
-  const { data, error } = await createClient().storage.from("course-materials").download(filePath(courseId, materialId));
-  if (error) return undefined;
-  return data;
+  if (!activeUserId) throw new Error("Sign in to access your private course files.");
+  const response = await fetch(`/api/materials/${encodeURIComponent(courseId)}/${encodeURIComponent(materialId)}`, { cache: "no-store" });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.error ?? "Could not retrieve this PDF from cloud storage.");
+  }
+  return response.blob();
 }
 
 export async function deleteMaterialFile(courseId: string, materialId: string) {

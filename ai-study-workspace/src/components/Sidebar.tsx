@@ -56,7 +56,8 @@ const links = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, signOut, workspaceSyncStatus } = useAuth();
+  const syncLabel = workspaceSyncStatus === "saved" ? "Cloud saved" : workspaceSyncStatus === "syncing" ? "Syncing" : "Sync problem";
 
   return (
     <>
@@ -91,6 +92,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-3 mt-4">
+        <div aria-live="polite" className={`px-3 pb-2 text-xs ${workspaceSyncStatus === "error" ? "text-red-600" : "text-slate-400"}`}>{syncLabel}</div>
         <ThemeToggle />
         {user && <button onClick={() => void signOut()} className="flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"><span className="truncate">Sign out · {user.email}</span></button>}
         <Link
@@ -111,7 +113,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="flex items-center justify-between border-t border-slate-100 px-4 py-1">
-        <span className="truncate text-[11px] text-slate-400">Study Workspace</span>
+        <span aria-live="polite" className={`truncate text-[11px] ${workspaceSyncStatus === "error" ? "text-red-600" : "text-slate-400"}`}>{syncLabel}</span>
         <div className="flex items-center gap-3"><ThemeToggle />{user && <button onClick={() => void signOut()} className="py-2 text-xs text-slate-500">Sign out</button>}</div>
       </div>
     </div>

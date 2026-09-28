@@ -40,7 +40,7 @@ export default function NewCoursePage() {
           for (let pageNumber = 1; pageNumber <= Math.min(document.numPages, 30); pageNumber += 1) {
             const page = await document.getPage(pageNumber);
             const text = await page.getTextContent();
-            pages.push(text.items.map((item) => "str" in item ? item.str : "").join(" "));
+            pages.push(`[PDF page ${pageNumber}]\n${text.items.map((item) => "str" in item ? item.str : "").join(" ")}`);
             if (pages.join("\n").length >= 12000) break;
           }
           const content = pages.join("\n\n").slice(0, 12000).trim();
