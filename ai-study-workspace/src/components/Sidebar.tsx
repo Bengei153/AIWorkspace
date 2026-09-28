@@ -59,7 +59,8 @@ export function Sidebar() {
   const { user, signOut } = useAuth();
 
   return (
-    <div className="w-60 h-full bg-slate-50 border-r border-slate-200 flex flex-col pt-8 pb-4 flex-shrink-0">
+    <>
+    <div className="hidden md:flex w-60 h-full bg-slate-50 border-r border-slate-200 flex-col pt-8 pb-4 flex-shrink-0">
       <div className="px-6 mb-10">
         <div className="text-xl font-bold text-slate-900 tracking-tight">Study</div>
         <div className="text-xs text-slate-400 mt-0.5 font-medium uppercase tracking-wider">Workspace</div>
@@ -101,5 +102,19 @@ export function Sidebar() {
         </Link>
       </div>
     </div>
+    <div className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav aria-label="Main navigation" className="grid grid-cols-4">
+        {links.map((link) => {
+          const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+          const Icon = link.icon;
+          return <Link key={link.name} href={link.href} aria-current={isActive ? "page" : undefined} className={`flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] ${isActive ? "text-indigo-700" : "text-slate-500"}`}><Icon /><span>{link.name}</span></Link>;
+        })}
+      </nav>
+      <div className="flex items-center justify-between border-t border-slate-100 px-4 py-1">
+        <span className="truncate text-[11px] text-slate-400">Study Workspace</span>
+        <div className="flex items-center gap-3"><ThemeToggle />{user && <button onClick={() => void signOut()} className="py-2 text-xs text-slate-500">Sign out</button>}</div>
+      </div>
+    </div>
+    </>
   );
 }

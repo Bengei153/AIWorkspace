@@ -56,7 +56,7 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
   if (!workspaceReady) return <div className="p-10 text-sm text-slate-500">Loading your private workspace…</div>;
   if (savedCourse) {
     return (
-      <div className="max-w-6xl mx-auto px-8 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-12">
         <div className="mb-8 text-sm text-slate-500"><Link href="/courses" className="hover:text-slate-900">Courses</Link><span className="mx-2">/</span>{savedCourse.name}</div>
         <div className="mb-10 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-xs font-semibold uppercase text-emerald-700">AI learning path</p><h1 className="text-3xl font-semibold text-slate-900">{savedCourse.name}</h1><p className="mt-2 text-slate-500">{savedCourse.description}</p></div><div className="flex items-center gap-3"><DeleteButton label={savedCourse.name} onDelete={removeCourse} /><Link href={`/study/${savedCourse.id}`} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">Start learning</Link></div></div>
         <section><h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Learning path <span className="ml-2 font-normal normal-case">{savedCourse.sections.length} lessons</span></h2><ol className="divide-y divide-slate-200 border-y border-slate-200">{savedCourse.sections.map((section, index) => <li key={section.id}><Link href={`/study/${savedCourse.id}?lesson=${index}`} className="flex items-center gap-4 py-4 text-slate-800 hover:text-indigo-700"><span className="grid place-items-center w-8 h-8 rounded-full bg-slate-100 text-xs font-semibold">{String(index + 1).padStart(2, "0")}</span><span className="font-medium">{section.title}</span><span className="ml-auto text-sm text-slate-400">Open lesson →</span></Link></li>)}</ol></section>
@@ -71,21 +71,21 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
     </div>
   );
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-12">
       <div className="flex items-center space-x-2 text-sm text-slate-500 mb-8">
         <Link href="/" className="hover:text-slate-900">Home</Link><span>/</span>
         <Link href="/courses" className="hover:text-slate-900">Courses</Link><span>/</span>
         <span className="text-slate-900 font-medium">{course.name}</span>
       </div>
-      <div className="flex items-start justify-between mb-10">
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:mb-10 sm:flex-row">
         <div>
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">{course.name}</div>
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">{course.title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{course.title}</h1>
           <p className="text-slate-500 mt-2">{course.lecturer} - {course.description}</p>
         </div>
-        <div className="ml-8 flex flex-shrink-0 items-center gap-3"><DeleteButton label={course.name} onDelete={removeCourse} /><Link href={"/study/" + id} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">Continue Studying</Link></div>
+        <div className="flex w-full flex-shrink-0 items-center gap-3 sm:w-auto sm:ml-8"><DeleteButton label={course.name} onDelete={removeCourse} /><Link href={"/study/" + id} className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-indigo-700 sm:flex-none sm:px-5">Continue Studying</Link></div>
       </div>
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:mb-8 sm:p-6">
         <div className="flex justify-between items-center mb-3">
           <span className="text-sm font-medium text-slate-700">Overall Progress</span>
           <span className="text-sm font-semibold text-slate-900">{course.progress}%</span>
@@ -94,7 +94,7 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
           <div className={course.color + " h-full"} style={{ width: course.progress + "%" }}></div>
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
         <div className="lg:col-span-2">
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Materials</h2>
           <div className="space-y-3">

@@ -94,7 +94,7 @@ export default function NewCoursePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-8 py-12">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-8 sm:py-12">
       <div className="flex items-center space-x-2 text-sm text-slate-500 mb-8">
         <Link href="/" className="hover:text-slate-900">Home</Link>
         <span>/</span>
@@ -102,14 +102,14 @@ export default function NewCoursePage() {
         <span>/</span>
         <span className="text-slate-900 font-medium">New project</span>
       </div>
-      <h1 className="text-3xl font-semibold text-slate-900 tracking-tight mb-2">Create a learning path</h1>
+      <h1 className="mb-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Create a learning path</h1>
       <p className="text-slate-500 mb-10">Start with your study materials, a topic, or both.</p>
       <form onSubmit={createCourse} className="space-y-6">
         <div>
           <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-2">What do you want to learn?</label>
           <input id="topic" type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Photosynthesis, from basics to exam revision" className="w-full border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 bg-white" />
         </div>
-        <div className="border border-slate-200 rounded-lg p-5">
+        <div className="rounded-lg border border-slate-200 p-4 sm:p-5">
           <label htmlFor="materials" className="block text-sm font-medium text-slate-800">Study materials</label>
           <p className="text-xs text-slate-500 mt-1 mb-4">Upload up to 12 PDF, TXT, Markdown, or CSV files, each up to 10 MB. PDFs are read for selectable text.</p>
           <input id="materials" type="file" multiple accept=".pdf,.txt,.md,.markdown,.csv,application/pdf,text/plain,text/markdown,text/csv" onChange={(event) => void addFiles(event.target.files)} className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-indigo-700" />

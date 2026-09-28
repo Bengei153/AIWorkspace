@@ -28,7 +28,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
   const searchParams = useSearchParams();
   const [course, setCourse] = useState<StudyCourse>();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [mode, setMode] = useState<"ask" | "design">("ask");
   const [provider, setProvider] = useState<string>(PROVIDERS[0].id);
   const [model, setModel] = useState<string>(PROVIDERS[0].model);
@@ -141,10 +141,10 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
     }
   }
 
-  if (!course) return <div className="grid h-screen place-items-center text-sm text-slate-500">Loading study session…</div>;
+  if (!course) return <div className="grid h-dvh place-items-center text-sm text-slate-500">Loading study session…</div>;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-white text-slate-900">
+    <div className="flex h-dvh flex-col overflow-hidden bg-white text-slate-900">
       <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3 text-sm text-slate-500"><Link href="/courses" className="hover:text-slate-900">Courses</Link><span>/</span><span className="truncate font-medium text-slate-900">{course.name}</span></div>
         <div className="flex items-center gap-3">
@@ -154,18 +154,19 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-56 flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 max-sm:w-44">
+        <aside className="hidden w-56 flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 sm:flex">
           <div className="border-b border-slate-200 p-4"><div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Learning path</div><div className="mt-1 text-xs text-slate-400">{sections.length} lessons</div></div>
           <nav className="space-y-1 p-2">{sections.map((section, index) => <button key={section.id} onClick={() => { setActiveIndex(index); setUpdated(false); }} className={`flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left text-sm ${index === activeIndex ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-100"}`}><span className="mt-0.5 text-[11px] text-slate-400">{String(index + 1).padStart(2, "0")}</span><span>{section.title}</span></button>)}</nav>
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto bg-white p-4 sm:p-8">
           <div className="mx-auto max-w-4xl">
+            <label className="mb-4 block sm:hidden"><span className="sr-only">Choose lesson</span><select value={activeIndex} onChange={(event) => { setActiveIndex(Number(event.target.value)); setUpdated(false); }} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm">{sections.map((section, index) => <option key={section.id} value={index}>{String(index + 1).padStart(2, "0")} · {section.title}</option>)}</select></label>
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Lesson {activeIndex + 1} of {lessonCount}</div><h1 className="mt-1 text-2xl font-semibold text-slate-900">{active.title}</h1></div>{updated && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">Reading updated</span>}</div>
             <div role="tablist" aria-label="Study content" className="mb-3 flex border-b border-slate-200">
-              <button role="tab" aria-selected={studyView === "lesson"} onClick={() => setStudyView("lesson")} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${studyView === "lesson" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Interactive lesson</button>
-              {pdfMaterials.length > 0 && <button role="tab" aria-selected={studyView === "pdf"} onClick={() => setStudyView("pdf")} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${studyView === "pdf" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Source PDF <span className="ml-1 text-xs text-slate-400">{pdfMaterials.length}</span></button>}
+              <button role="tab" aria-selected={studyView === "lesson"} onClick={() => setStudyView("lesson")} className={`border-b-2 px-3 py-2.5 text-xs font-medium sm:px-4 sm:text-sm ${studyView === "lesson" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Interactive lesson</button>
+              {pdfMaterials.length > 0 && <button role="tab" aria-selected={studyView === "pdf"} onClick={() => setStudyView("pdf")} className={`border-b-2 px-3 py-2.5 text-xs font-medium sm:px-4 sm:text-sm ${studyView === "pdf" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Source PDF <span className="ml-1 text-xs text-slate-400">{pdfMaterials.length}</span></button>}
             </div>
-            {studyView === "lesson" ? <iframe key={`${active.id}-${active.html.length}-${active.js?.length ?? 0}`} title={`Interactive lesson: ${active.title}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={previewDocument(active)} className="h-[min(68vh,760px)] min-h-[430px] w-full rounded-lg border border-slate-200 bg-white" /> : <section aria-label="Original PDF" className="flex h-[min(78vh,900px)] min-h-[540px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            {studyView === "lesson" ? <iframe key={`${active.id}-${active.html.length}-${active.js?.length ?? 0}`} title={`Interactive lesson: ${active.title}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={previewDocument(active)} className="h-[min(62dvh,760px)] min-h-[360px] w-full rounded-lg border border-slate-200 bg-white sm:h-[min(68vh,760px)] sm:min-h-[430px]" /> : <section aria-label="Original PDF" className="flex h-[min(70dvh,900px)] min-h-[420px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:h-[min(78vh,900px)] sm:min-h-[540px]">
               {pdfMaterials.length > 1 && <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2"><label htmlFor="source-pdf" className="text-xs font-medium text-slate-600">Source material</label><select id="source-pdf" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)} className="max-w-[70%] rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm">{pdfMaterials.map((material, index) => <option key={material.id ?? index} value={material.id ?? ""}>{material.name}</option>)}</select></div>}
               {selectedPdf ? <iframe key={selectedPdf.id} title={`Original PDF: ${selectedPdf.name}`} src={selectedPdf.url} className="min-h-0 w-full flex-1 bg-white" /> : <div className="grid flex-1 place-items-center p-6 text-center text-sm text-slate-600">The original PDF isn’t available in this browser for this project. Re-upload it in a new learning path to keep a viewable copy.</div>}
             </section>}

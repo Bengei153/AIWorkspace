@@ -50,7 +50,7 @@ export default function Home() {
     .slice(0, 5);
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-12">
       <header className="mb-12">
         <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">{greeting}</h1>
         <p className="text-slate-500 mt-2">Here is your academic overview for today.</p>

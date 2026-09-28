@@ -30,7 +30,7 @@ export default function CoursesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-12">
       <header className="mb-10 flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">Your Courses</h1>
