@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 export type StudySection = { id: string; title: string; html: string; css: string; js?: string };
-export type StudyMaterial = { id?: string; name: string; content: string; type?: "pdf" | "text" };
+export type StudyMaterial = { id?: string; name: string; content: string; type?: "pdf" | "word" | "powerpoint" | "text" };
 export type StudyCourse = {
   id: string;
   name: string;
@@ -177,7 +177,7 @@ async function migrateLegacyPdfs(snapshot: WorkspaceSnapshot) {
     for (const material of course.materials) {
       if (material.type !== "pdf" || !material.id) continue;
       const blob = await readLegacyPdf(course.id, material.id);
-      if (blob) await saveMaterialFile(course.id, material.id, blob);
+      if (blob) await saveMaterialFile(course.id, material.id, blob, material.name);
     }
   }
 }
@@ -292,9 +292,12 @@ export function readDeletedMaterialIds(courseId: string) {
 export function deleteMaterialData(courseId: string, materialId: string) {
   const course = findCourse(courseId);
   if (course) {
+    const removedMaterial = course.materials.find((item, index) => (item.id ?? `material-${index}`) === materialId);
     const materials = course.materials.filter((item, index) => (item.id ?? `material-${index}`) !== materialId);
     saveCourse({ ...course, materials });
-    void deleteMaterialFile(courseId, materialId);
+    if (removedMaterial?.type === "pdf" || removedMaterial?.type === "word" || removedMaterial?.type === "powerpoint") {
+      void deleteMaterialFile(courseId, materialId, removedMaterial.name);
+    }
     return materials;
   }
   updateWorkspace((snapshot) => ({
@@ -304,19 +307,32 @@ export function deleteMaterialData(courseId: string, materialId: string) {
   return null;
 }
 
-function filePath(courseId: string, materialId: string) {
-  if (!activeUserId) throw new Error("Sign in to access your private course files.");
-  return `${activeUserId}/${courseId}/${materialId}.pdf`;
+function officeExtension(fileName: string) {
+  const extension = fileName.toLowerCase().split(".").pop();
+  if (extension !== "pdf" && extension !== "docx" && extension !== "pptx") {
+    throw new Error("Only PDF, DOCX, and PPTX originals can be stored.");
+  }
+  return extension;
 }
 
-export async function saveMaterialFile(courseId: string, materialId: string, file: Blob) {
-  const { error } = await createClient().storage.from("course-materials").upload(filePath(courseId, materialId), file, { contentType: "application/pdf", upsert: true });
-  if (error) throw new Error("Could not securely save the PDF. Check the private storage migration and try again.");
+function filePath(courseId: string, materialId: string, fileName: string) {
+  if (!activeUserId) throw new Error("Sign in to access your private course files.");
+  return `${activeUserId}/${courseId}/${materialId}.${officeExtension(fileName)}`;
 }
 
-export async function readMaterialFile(courseId: string, materialId: string) {
+export async function saveMaterialFile(courseId: string, materialId: string, file: Blob, fileName: string) {
+  const extension = officeExtension(fileName);
+  const contentType = extension === "pdf" ? "application/pdf" : extension === "docx"
+    ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  const { error } = await createClient().storage.from("course-materials").upload(filePath(courseId, materialId, fileName), file, { contentType, upsert: true });
+  if (error) throw new Error("Could not securely save this original file. Check the private materials migration and try again.");
+}
+
+export async function readMaterialFile(courseId: string, materialId: string, fileName: string) {
   if (!activeUserId) throw new Error("Sign in to access your private course files.");
-  const response = await fetch(`/api/materials/${encodeURIComponent(courseId)}/${encodeURIComponent(materialId)}`, { cache: "no-store" });
+  const extension = officeExtension(fileName);
+  const response = await fetch(`/api/materials/${encodeURIComponent(courseId)}/${encodeURIComponent(materialId)}?format=${extension}`, { cache: "no-store" });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
     throw new Error(result.error ?? "Could not retrieve this PDF from cloud storage.");
@@ -324,9 +340,9 @@ export async function readMaterialFile(courseId: string, materialId: string) {
   return response.blob();
 }
 
-export async function deleteMaterialFile(courseId: string, materialId: string) {
+export async function deleteMaterialFile(courseId: string, materialId: string, fileName: string) {
   if (!activeUserId) return;
-  await createClient().storage.from("course-materials").remove([filePath(courseId, materialId)]);
+  await createClient().storage.from("course-materials").remove([filePath(courseId, materialId, fileName)]);
 }
 
 export async function deleteCourseFiles(courseId: string) {

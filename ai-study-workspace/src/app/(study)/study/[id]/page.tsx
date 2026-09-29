@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
-import { findCourse, getProviderKeyName, PROVIDERS, readMaterialFile, saveCourse, type StudyCourse, type StudySection } from "@/lib/workspace";
+import { findCourse, getProviderKeyName, PROVIDERS, readMaterialFile, saveCourse, type StudyCourse, type StudyMaterial, type StudySection } from "@/lib/workspace";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -37,10 +37,10 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [updated, setUpdated] = useState(false);
-  const [sourcePdfs, setSourcePdfs] = useState<{ id: string; name: string; url: string }[]>([]);
-  const [pdfLoadError, setPdfLoadError] = useState("");
-  const [studyView, setStudyView] = useState<"lesson" | "pdf">("lesson");
-  const [selectedPdfId, setSelectedPdfId] = useState("");
+  const [sourceFiles, setSourceFiles] = useState<{ id: string; name: string; url: string; material: StudyMaterial }[]>([]);
+  const [fileLoadError, setFileLoadError] = useState("");
+  const [studyView, setStudyView] = useState<"lesson" | "source">("lesson");
+  const [selectedSourceId, setSelectedSourceId] = useState("");
 
   useEffect(() => {
     if (!workspaceReady) return;
@@ -58,7 +58,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
   }, [id, searchParams, workspaceReady, workspaceRevision]);
 
   const materialCourseId = course?.id;
-  const sourceMaterials = useMemo(() => course?.materials.filter((material) => material.type === "pdf" && material.id) ?? [], [course?.materials]);
+  const sourceMaterials = useMemo(() => course?.materials.filter((material) => ["pdf", "word", "powerpoint"].includes(material.type ?? "") && material.id) ?? [], [course?.materials]);
 
   useEffect(() => {
     if (!materialCourseId) return;
@@ -67,13 +67,13 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
     let loadError = "";
     void Promise.all(sourceMaterials.map(async (material) => {
       try {
-        const blob = await readMaterialFile(materialCourseId, material.id!);
+        const blob = await readMaterialFile(materialCourseId, material.id!, material.name);
         if (!blob) return null;
         const url = URL.createObjectURL(blob);
         urls.push(url);
-        return { id: material.id!, name: material.name, url };
-      } catch {
-        loadError ||= "A source PDF could not be downloaded from your private cloud storage. Check that you are signed into the same account and that the storage migration is applied.";
+        return { id: material.id!, name: material.name, url, material };
+      } catch (reason) {
+        loadError ||= reason instanceof Error ? reason.message : "A source file could not be downloaded from your private cloud storage.";
         return null;
       }
     })).then((loaded) => {
@@ -81,10 +81,10 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
         urls.forEach(URL.revokeObjectURL);
         return;
       }
-      const available = loaded.filter((item): item is { id: string; name: string; url: string } => item !== null);
-      setSourcePdfs(available);
-      setPdfLoadError(available.length ? "" : loadError);
-      setSelectedPdfId((selected) => available.some((item) => item.id === selected) ? selected : available[0]?.id ?? "");
+      const available = loaded.filter((item): item is { id: string; name: string; url: string; material: StudyMaterial } => item !== null);
+      setSourceFiles(available);
+      setFileLoadError(loadError);
+      setSelectedSourceId((selected) => available.some((item) => item.id === selected) ? selected : available[0]?.id ?? "");
     });
     return () => {
       current = false;
@@ -94,8 +94,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
 
   const sections = course?.sections ?? [];
   const active = sections[activeIndex] ?? sections[0] ?? SAMPLE_SECTION;
-  const pdfMaterials = sourceMaterials;
-  const selectedPdf = sourcePdfs.find((pdf) => pdf.id === selectedPdfId);
+  const selectedSource = sourceFiles.find((file) => file.id === selectedSourceId);
   const lessonCount = Math.max(sections.length, 1);
   const progress = Math.round(((activeIndex + 1) / lessonCount) * 100);
   const providerLabel = useMemo(() => PROVIDERS.find((item) => item.id === provider)?.label ?? provider, [provider]);
@@ -168,11 +167,12 @@ export default function StudySessionPage({ params }: { params: Promise<{ id: str
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Lesson {activeIndex + 1} of {lessonCount}</div><h1 className="mt-1 text-2xl font-semibold text-slate-900">{active.title}</h1></div>{updated && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">Reading updated</span>}</div>
             <div role="tablist" aria-label="Study content" className="mb-3 flex border-b border-slate-200">
               <button role="tab" aria-selected={studyView === "lesson"} onClick={() => setStudyView("lesson")} className={`border-b-2 px-3 py-2.5 text-xs font-medium sm:px-4 sm:text-sm ${studyView === "lesson" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Interactive lesson</button>
-              {pdfMaterials.length > 0 && <button role="tab" aria-selected={studyView === "pdf"} onClick={() => setStudyView("pdf")} className={`border-b-2 px-3 py-2.5 text-xs font-medium sm:px-4 sm:text-sm ${studyView === "pdf" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Source PDF <span className="ml-1 text-xs text-slate-400">{pdfMaterials.length}</span></button>}
+              {sourceMaterials.length > 0 && <button role="tab" aria-selected={studyView === "source"} onClick={() => setStudyView("source")} className={`border-b-2 px-3 py-2.5 text-xs font-medium sm:px-4 sm:text-sm ${studyView === "source" ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Source files <span className="ml-1 text-xs text-slate-400">{sourceMaterials.length}</span></button>}
             </div>
-            {studyView === "lesson" ? <iframe key={`${active.id}-${active.html.length}-${active.js?.length ?? 0}`} title={`Interactive lesson: ${active.title}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={previewDocument(active)} className="h-[min(62dvh,760px)] min-h-[360px] w-full rounded-lg border border-slate-200 bg-white sm:h-[min(68vh,760px)] sm:min-h-[430px]" /> : <section aria-label="Original PDF" className="flex h-[min(70dvh,900px)] min-h-[420px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:h-[min(78vh,900px)] sm:min-h-[540px]">
-              {pdfMaterials.length > 1 && <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2"><label htmlFor="source-pdf" className="text-xs font-medium text-slate-600">Source material</label><select id="source-pdf" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)} className="max-w-[70%] rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm">{pdfMaterials.map((material, index) => <option key={material.id ?? index} value={material.id ?? ""}>{material.name}</option>)}</select></div>}
-              {selectedPdf ? <iframe key={selectedPdf.id} title={`Original PDF: ${selectedPdf.name}`} src={selectedPdf.url} className="min-h-0 w-full flex-1 bg-white" /> : <div className="grid flex-1 place-items-center p-6 text-center text-sm text-slate-600">{pdfLoadError || "No viewable PDF is attached to this course."}</div>}
+            {studyView === "lesson" ? <iframe key={`${active.id}-${active.html.length}-${active.js?.length ?? 0}`} title={`Interactive lesson: ${active.title}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={previewDocument(active)} className="h-[min(62dvh,760px)] min-h-[360px] w-full rounded-lg border border-slate-200 bg-white sm:h-[min(68vh,760px)] sm:min-h-[430px]" /> : <section aria-label="Original source material" className="flex h-[min(70dvh,900px)] min-h-[420px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:h-[min(78vh,900px)] sm:min-h-[540px]">
+              {sourceFiles.length > 1 && <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2"><label htmlFor="source-file" className="text-xs font-medium text-slate-600">Source material</label><select id="source-file" value={selectedSourceId} onChange={(event) => setSelectedSourceId(event.target.value)} className="max-w-[70%] rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm">{sourceFiles.map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}</select></div>}
+              {sourceFiles.length > 0 && fileLoadError && <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">Some source files could not be loaded: {fileLoadError}</p>}
+              {selectedSource?.material.type === "pdf" ? <iframe key={selectedSource.id} title={`Original PDF: ${selectedSource.name}`} src={selectedSource.url} className="min-h-0 w-full flex-1 bg-white" /> : selectedSource ? <div className="flex min-h-0 flex-1 flex-col bg-white"><div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{selectedSource.name}</p><p className="text-xs text-slate-500">Extracted text preview</p></div><a href={selectedSource.url} download={selectedSource.name} className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white">Download original</a></div><pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-4 font-sans text-sm leading-6 text-slate-700">{selectedSource.material.content}</pre></div> : <div className="grid flex-1 place-items-center p-6 text-center text-sm text-slate-600">{fileLoadError || "No source file is attached to this course."}</div>}
             </section>}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-400">Using {providerLabel} · {model}</span><div className="flex gap-2"><button disabled={activeIndex <= 0} onClick={() => setActiveIndex((index) => Math.max(0, index - 1))} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 disabled:opacity-40">Previous</button><button disabled={activeIndex >= lessonCount - 1} onClick={() => setActiveIndex((index) => Math.min(lessonCount - 1, index + 1))} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40">Next lesson</button></div></div>
           </div>
